@@ -1,4 +1,4 @@
-# Supabase config optimized for CI: disable nonessential services
+# Supabase config ULTRA-optimized for CI: minimal services for fastest startup
 project_id = "env(SUPABASE_PROJECT_ID)"
 
 [api]
@@ -6,6 +6,8 @@ enabled = true
 port = "env(LOCAL_SUPABASE_API_PORT)"
 schemas = ["public"]
 extra_search_path = ["public", "extensions"]
+# Reduced max_rows for faster queries in tests
+max_rows = 100
 
 [api.tls]
 enabled = false
@@ -14,6 +16,10 @@ enabled = false
 port = "env(LOCAL_SUPABASE_DB_PORT)"
 shadow_port = "env(LOCAL_SUPABASE_DB_SHADOW_PORT)"
 major_version = 15
+# Faster startup settings
+log_level = "error"
+# Reduce memory for faster startup
+shared_preload_libraries = []
 
 [db.pooler]
 enabled = false
@@ -22,8 +28,9 @@ enabled = false
 enabled = false
 sql_paths = []
 
+# Disable realtime for CI unless specifically needed
 [realtime]
-enabled = true
+enabled = false
 
 [studio]
 enabled = false
@@ -33,6 +40,8 @@ enabled = false
 
 [storage]
 enabled = true
+# Minimal storage config for CI
+file_size_limit = "5MiB"
 
 [auth]
 enabled = true
@@ -40,11 +49,17 @@ site_url = "http://localhost:3020"
 additional_redirect_urls = ["http://localhost:3020"]
 enable_signup = false
 enable_anonymous_sign_ins = false
+# Faster JWT settings for CI
+jwt_expiry = 300
+enable_refresh_token_rotation = false
 
 [edge_runtime]
 enabled = false
 
 [analytics]
+enabled = false
+
+[functions]
 enabled = false
 
 [experimental]
