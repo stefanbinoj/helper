@@ -42,6 +42,46 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Debug Cache Info
+        run: |
+          echo "=== Runner Information ==="
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner Arch: ${{ runner.arch }}"
+          echo "GitHub Repository: ${{ github.repository }}"
+          echo "GitHub Ref: ${{ github.ref }}"
+          echo "GitHub SHA: ${{ github.sha }}"
+          echo ""
+          echo "=== Cache Key Information ==="
+          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
+          echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
+          echo "Supabase cache key: supabase-images-${{ env.SUPABASE_VERSION_HASH }}-${{ env.SUPABASE_CONFIG_HASH }}"
+          echo "pnpm-lock.yaml hash: ${{ hashFiles('**/pnpm-lock.yaml') }}"
+          echo "Frontend files hash: ${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
+          echo "Supabase version hash: ${{ env.SUPABASE_VERSION_HASH }}"
+          echo "Supabase config hash: ${{ env.SUPABASE_CONFIG_HASH }}"
+          echo ""
+          echo "=== Cache Directory Status ==="
+          ls -la ~/.cache/ || echo "No ~/.cache directory found"
+          ls -la ~/.cache/ms-playwright || echo "No Playwright cache directory found"
+          ls -la .next/ || echo "No .next directory found"
+          ls -la /tmp/supabase-images || echo "No Supabase images cache directory found"
+          echo ""
+          echo "=== Supabase Cache Information ==="
+          ls -la ~/.cache/supabase || echo "No Supabase cache directory found"
+          ls -la ~/.local/share/supabase || echo "No Supabase local share directory found"
+          which supabase || echo "Supabase CLI not found in PATH"
+          supabase --version || echo "Cannot get Supabase version"
+          echo ""
+          echo "=== Docker Images (for Supabase) ==="
+          docker images | grep -E "^(supabase/|postgrest/)" || echo "No Supabase Docker images found"
+          docker system df || echo "Cannot get Docker system info"
+          echo ""
+          echo "=== System Information ==="
+          uname -a
+          cat /etc/os-release || echo "Cannot read OS release info"
+          df -h / || echo "Cannot get disk usage"
+          free -h || echo "Cannot get memory info"
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
