@@ -73,9 +73,9 @@ jobs:
 
       - name: Install Supabase CLI
         run: |
+          rm -f supabase
           curl -sL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
           sudo mv supabase /usr/local/bin
-          supabase --version
 
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh
