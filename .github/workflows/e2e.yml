@@ -55,7 +55,7 @@ jobs:
             playwright-browsers-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile
 
       - name: Cache Next.js build cache
         uses: actions/cache@v4
@@ -70,12 +70,6 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-
-      - name: Install Supabase CLI
-        run: |
-          rm -f supabase
-          curl -sL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
-          sudo mv supabase /usr/local/bin
 
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh
