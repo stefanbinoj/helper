@@ -1,0 +1,179 @@
+name: ubuntu build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: true
+      OPENAI_API_KEY: test-openai-api-key
+      FIRECRAWL_API_KEY: test-firecrawl-api-key
+      NODE_OPTIONS: --max_old_space_size=8192
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".node-version"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Debug Cache Info
+        run: |
+          echo "=== Runner Information ==="
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner Arch: ${{ runner.arch }}"
+          echo "GitHub Repository: ${{ github.repository }}"
+          echo "GitHub Ref: ${{ github.ref }}"
+          echo "GitHub SHA: ${{ github.sha }}"
+          echo ""
+          echo "=== Cache Key Information ==="
+          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
+          echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
+          echo "Supabase cache key: supabase-images-${{ env.SUPABASE_VERSION_HASH }}-${{ env.SUPABASE_CONFIG_HASH }}"
+          echo "pnpm-lock.yaml hash: ${{ hashFiles('**/pnpm-lock.yaml') }}"
+          echo "Frontend files hash: ${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
+          echo "Supabase version hash: ${{ env.SUPABASE_VERSION_HASH }}"
+          echo "Supabase config hash: ${{ env.SUPABASE_CONFIG_HASH }}"
+          echo ""
+          echo "=== Cache Directory Status ==="
+          ls -la ~/.cache/ || echo "No ~/.cache directory found"
+          ls -la ~/.cache/ms-playwright || echo "No Playwright cache directory found"
+          ls -la .next/ || echo "No .next directory found"
+          ls -la /tmp/supabase-images || echo "No Supabase images cache directory found"
+          echo ""
+          echo "=== Supabase Cache Information ==="
+          ls -la ~/.cache/supabase || echo "No Supabase cache directory found"
+          ls -la ~/.local/share/supabase || echo "No Supabase local share directory found"
+          which supabase || echo "Supabase CLI not found in PATH"
+          supabase --version || echo "Cannot get Supabase version"
+          echo ""
+          echo "=== Docker Images (for Supabase) ==="
+          docker images | grep -E "^(supabase/|postgrest/)" || echo "No Supabase Docker images found"
+          docker system df || echo "Cannot get Docker system info"
+          echo ""
+          echo "=== System Information ==="
+          uname -a
+          cat /etc/os-release || echo "Cannot read OS release info"
+          df -h / || echo "Cannot get disk usage"
+          free -h || echo "Cannot get memory info"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-v1
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
+
+      - name: Install Playwright Browsers
+        run: pnpm playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Cache Next.js build
+        id: next-cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('frontend/**/*.{ts,tsx}') }}
+          restore-keys: |
+            next-cache-${{ runner.os }}-
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Compute a cache key for Supabase Docker images based on CLI version and CI config
+      - name: Compute Supabase image cache key
+        id: supabase-key
+        run: |
+          set -euo pipefail
+          echo "SUPABASE_CONFIG_HASH=$(sha256sum supabase/config.ci.toml | cut -d ' ' -f1)" >> $GITHUB_ENV
+          # Hash the CLI version string to avoid brittle parsing
+          supabase --version | sha256sum | cut -d ' ' -f1 | xargs -I{} echo "SUPABASE_VERSION_HASH={}" >> $GITHUB_ENV
+
+      # Restore cached Supabase images if available
+      - name: Restore Supabase images cache
+        id: cache-supabase
+        uses: actions/cache@v4
+        with:
+          path: /tmp/supabase-images
+          key: supabase-images-${{ env.SUPABASE_VERSION_HASH }}-${{ env.SUPABASE_CONFIG_HASH }}
+          restore-keys: |
+            supabase-images-${{ env.SUPABASE_VERSION_HASH }}-
+            supabase-images-
+
+      # Load images from cache into Docker
+      - name: Load cached Supabase images
+        if: steps.cache-supabase.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/supabase-images/supabase-images.tar
+
+      # Prime cache on miss: start Supabase once to pull images, save them, then stop
+      - name: Pre-pull Supabase images and cache them (cache miss)
+        if: steps.cache-supabase.outputs.cache-hit != 'true'
+        env:
+          SUPABASE_CONFIG_PATH: ./supabase/config.ci.toml
+        run: |
+          set -euo pipefail
+          # Load ports and project id expected by config.ci.toml
+          set -o allexport
+          source .env.test
+          set +o allexport
+
+          # Start once to pull images
+          supabase start
+
+          # Save supabase-related images to a tar for caching
+          mkdir -p /tmp/supabase-images
+          IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "^(supabase/|postgrest/postgrest)") || true
+          if [ -n "${IMAGES:-}" ]; then
+            docker save $IMAGES -o /tmp/supabase-images/supabase-images.tar
+          else
+            echo "No Supabase images found to cache"
+          fi
+
+          # Stop again (your setup script will start services cleanly)
+          supabase stop
+
+      - name: Setup E2E test environment
+        run: ./scripts/setup-e2e-tests.sh
+
+      - name: Build next
+        run: pnpm with-test-env next build
+
+      - name: Run full Playwright suite
+        run: ./scripts/e2e.sh
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
