@@ -64,8 +64,10 @@ jobs:
           restore-keys: |
             next-cache-${{ runner.os }}-
 
-      - name: Install supabase CLI
-        run: pnpm add -g supabase
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh
