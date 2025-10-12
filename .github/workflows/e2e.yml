@@ -55,7 +55,7 @@ jobs:
             playwright-browsers-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --with-deps chromium
 
       - name: Cache Next.js build cache
         uses: actions/cache@v4
