@@ -64,6 +64,9 @@ jobs:
           restore-keys: |
             next-cache-${{ runner.os }}-
 
+      - name: Install supabase CLI
+        run: pnpm add -g supabase
+
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh
 
