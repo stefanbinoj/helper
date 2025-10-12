@@ -42,7 +42,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -52,6 +51,10 @@ jobs:
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
 
+      - name: Install Playwright Browsers
+        run: pnpm playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
       - name: Cache Next.js build
         id: next-cache
         uses: actions/cache@v4
@@ -60,10 +63,6 @@ jobs:
           key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('frontend/**/*.{ts,tsx}') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
-
-      - name: Install Playwright Browsers
-        run: pnpm playwright install --with-deps chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
 
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh
