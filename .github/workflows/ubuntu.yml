@@ -58,16 +58,43 @@ jobs:
           echo ""
           echo "=== Early Cache Key Information ==="
           echo "Next.js cache key (old pattern): next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
-          echo "Next.js cache key (new pattern): next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.{ts,tsx}', '!node_modules/**', '!.next/**') }}"
+          echo "Next.js cache key (new pattern): next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}"
           echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
           echo "pnpm-lock.yaml hash: ${{ hashFiles('**/pnpm-lock.yaml') }}"
           echo "Frontend files hash (original pattern): ${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
-          echo "All TS/TSX files hash (new pattern): ${{ hashFiles('**/*.{ts,tsx}', '!node_modules/**', '!.next/**') }}"
+          echo "All TS/TSX files hash (new pattern): ${{ hashFiles('**/*.ts', '**/*.tsx') }}"
           echo "Note: Supabase hashes will be empty until CLI is installed"
+          echo ""
+          echo "=== File Count Verification ==="
+          echo "Total .ts files: $(find . -name '*.ts' | grep -v node_modules | wc -l)"
+          echo "Total .tsx files: $(find . -name '*.tsx' | grep -v node_modules | wc -l)"
+          echo "Sample .ts files:"
+          find . -name '*.ts' | grep -v node_modules | head -5
+          echo "Sample .tsx files:"
+          find . -name '*.tsx' | grep -v node_modules | head -5
+          echo ""
+          echo "=== Repository & Cache Analysis ==="
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Is this a fork? ${{ github.repository != github.event.repository.parent.full_name }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Previous successful workflows might have created cache"
           echo ""
           echo "=== System Information ==="
           uname -a
           cat /etc/os-release || echo "Cannot read OS release info"
+
+      - name: Debug Cache Lookup
+        run: |
+          echo "=== About to lookup Playwright cache ==="
+          echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
+          echo "Playwright cache path: ~/.cache/ms-playwright"
+          ls -la ~/.cache/ || echo "No cache directory exists yet"
+          echo ""
+          echo "=== About to lookup Next.js cache ==="
+          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}"
+          echo "Next.js cache path: .next/cache"
+          ls -la .next/ || echo "No .next directory exists yet"
 
       - name: Cache Playwright browsers
         id: playwright-cache
@@ -78,6 +105,20 @@ jobs:
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
 
+      - name: Check Playwright Cache Result
+        run: |
+          echo "=== Playwright Cache Result ==="
+          echo "Cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          echo "Cache primary key: ${{ steps.playwright-cache.outputs.cache-primary-key }}"
+          echo "Cache matched key: ${{ steps.playwright-cache.outputs.cache-matched-key }}"
+          ls -la ~/.cache/ms-playwright || echo "No Playwright cache directory found"
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Cache HIT - browsers should be available"
+            ls -la ~/.cache/ms-playwright/ | head -10
+          else
+            echo "❌ Cache MISS - will install browsers"
+          fi
+
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -87,7 +128,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .next/cache
-          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.{ts,tsx}', '!node_modules/**', '!.next/**') }}
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
 
@@ -151,11 +192,11 @@ jobs:
       - name: Debug Cache Info (After Supabase Setup)
         run: |
           echo "=== Final Cache Key Information ==="
-          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.{ts,tsx}', '!node_modules/**', '!.next/**') }}"
+          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}"
           echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
           echo "Supabase cache key: supabase-images-${{ env.SUPABASE_VERSION_HASH }}-${{ env.SUPABASE_CONFIG_HASH }}"
           echo "pnpm-lock.yaml hash: ${{ hashFiles('**/pnpm-lock.yaml') }}"
-          echo "All TS/TSX files hash: ${{ hashFiles('**/*.{ts,tsx}', '!node_modules/**', '!.next/**') }}"
+          echo "All TS/TSX files hash: ${{ hashFiles('**/*.ts', '**/*.tsx') }}"
           echo "Supabase version hash: ${{ env.SUPABASE_VERSION_HASH }}"
           echo "Supabase config hash: ${{ env.SUPABASE_CONFIG_HASH }}"
           echo ""
