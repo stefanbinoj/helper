@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test/*
   pull_request:
 
 permissions:
@@ -22,79 +23,25 @@ jobs:
       OPENAI_API_KEY: test-openai-api-key
       FIRECRAWL_API_KEY: test-firecrawl-api-key
       NODE_OPTIONS: --max_old_space_size=8192
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+            node-version-file: ".node-version"
+
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
           cache: true
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".node-version"
-          cache: "pnpm"
-
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Debug Cache Info (Before Supabase Setup)
-        run: |
-          echo "=== Runner Information ==="
-          echo "Runner OS: ${{ runner.os }}"
-          echo "Runner Arch: ${{ runner.arch }}"
-          echo "GitHub Repository: ${{ github.repository }}"
-          echo "GitHub Ref: ${{ github.ref }}"
-          echo "GitHub SHA: ${{ github.sha }}"
-          echo ""
-          echo "=== Project Structure Analysis ==="
-          find . -name "*.ts" -o -name "*.tsx" | head -20
-          find . -name "frontend" -type d || echo "No frontend directory found"
-          find . -path "*/frontend/**" -name "*.ts" -o -path "*/frontend/**" -name "*.tsx" | head -10
-          echo ""
-          echo "=== Early Cache Key Information ==="
-          echo "Next.js cache key (old pattern): next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
-          echo "Next.js cache key (new pattern): next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}"
-          echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
-          echo "pnpm-lock.yaml hash: ${{ hashFiles('**/pnpm-lock.yaml') }}"
-          echo "Frontend files hash (original pattern): ${{ hashFiles('frontend/**/*.{ts,tsx}') }}"
-          echo "All TS/TSX files hash (new pattern): ${{ hashFiles('**/*.ts', '**/*.tsx') }}"
-          echo "Note: Supabase hashes will be empty until CLI is installed"
-          echo ""
-          echo "=== File Count Verification ==="
-          echo "Total .ts files: $(find . -name '*.ts' | grep -v node_modules | wc -l)"
-          echo "Total .tsx files: $(find . -name '*.tsx' | grep -v node_modules | wc -l)"
-          echo "Sample .ts files:"
-          find . -name '*.ts' | grep -v node_modules | head -5
-          echo "Sample .tsx files:"
-          find . -name '*.tsx' | grep -v node_modules | head -5
-          echo ""
-          echo "=== Repository & Cache Analysis ==="
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Is this a fork? ${{ github.repository != github.event.repository.parent.full_name }}"
-          echo "Event: ${{ github.event_name }}"
-          echo "Previous successful workflows might have created cache"
-          echo ""
-          echo "=== System Information ==="
-          uname -a
-          cat /etc/os-release || echo "Cannot read OS release info"
-
-      - name: Debug Cache Lookup
-        run: |
-          echo "=== About to lookup Playwright cache ==="
-          echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
-          echo "Playwright cache path: ~/.cache/ms-playwright"
-          ls -la ~/.cache/ || echo "No cache directory exists yet"
-          echo ""
-          echo "=== About to lookup Next.js cache ==="
-          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}"
-          echo "Next.js cache path: .next/cache"
-          ls -la .next/ || echo "No .next directory exists yet"
+        run: pnpm install --ignore-scripts
 
       - name: Cache Playwright browsers
         id: playwright-cache
@@ -104,20 +51,6 @@ jobs:
           key: playwright-browsers-${{ runner.os }}-v1
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
-
-      - name: Check Playwright Cache Result
-        run: |
-          echo "=== Playwright Cache Result ==="
-          echo "Cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
-          echo "Cache primary key: ${{ steps.playwright-cache.outputs.cache-primary-key }}"
-          echo "Cache matched key: ${{ steps.playwright-cache.outputs.cache-matched-key }}"
-          ls -la ~/.cache/ms-playwright || echo "No Playwright cache directory found"
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" == "true" ]; then
-            echo "✅ Cache HIT - browsers should be available"
-            ls -la ~/.cache/ms-playwright/ | head -10
-          else
-            echo "❌ Cache MISS - will install browsers"
-          fi
 
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
@@ -130,102 +63,14 @@ jobs:
           path: .next/cache
           key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
           restore-keys: |
+            next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
             next-cache-${{ runner.os }}-
-
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      # Compute a cache key for Supabase Docker images based on CLI version and CI config
-      - name: Compute Supabase image cache key
-        id: supabase-key
-        run: |
-          set -euo pipefail
-          echo "SUPABASE_CONFIG_HASH=$(sha256sum supabase/config.ci.toml | cut -d ' ' -f1)" >> $GITHUB_ENV
-          # Hash the CLI version string to avoid brittle parsing
-          supabase --version | sha256sum | cut -d ' ' -f1 | xargs -I{} echo "SUPABASE_VERSION_HASH={}" >> $GITHUB_ENV
-
-      # Restore cached Supabase images if available
-      - name: Restore Supabase images cache
-        id: cache-supabase
-        uses: actions/cache@v4
-        with:
-          path: /tmp/supabase-images
-          key: supabase-images-${{ env.SUPABASE_VERSION_HASH }}-${{ env.SUPABASE_CONFIG_HASH }}
-          restore-keys: |
-            supabase-images-${{ env.SUPABASE_VERSION_HASH }}-
-            supabase-images-
-
-      # Load images from cache into Docker
-      - name: Load cached Supabase images
-        if: steps.cache-supabase.outputs.cache-hit == 'true'
-        run: docker load -i /tmp/supabase-images/supabase-images.tar
-
-      # Prime cache on miss: start Supabase once to pull images, save them, then stop
-      - name: Pre-pull Supabase images and cache them (cache miss)
-        if: steps.cache-supabase.outputs.cache-hit != 'true'
-        env:
-          SUPABASE_CONFIG_PATH: ./supabase/config.ci.toml
-        run: |
-          set -euo pipefail
-          # Load ports and project id expected by config.ci.toml
-          set -o allexport
-          source .env.test
-          set +o allexport
-
-          # Start once to pull images
-          supabase start
-
-          # Save supabase-related images to a tar for caching
-          mkdir -p /tmp/supabase-images
-          IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "^(supabase/|postgrest/postgrest)") || true
-          if [ -n "${IMAGES:-}" ]; then
-            docker save $IMAGES -o /tmp/supabase-images/supabase-images.tar
-          else
-            echo "No Supabase images found to cache"
-          fi
-
-          # Stop again (your setup script will start services cleanly)
-          supabase stop
-
-      - name: Debug Cache Info (After Supabase Setup)
-        run: |
-          echo "=== Final Cache Key Information ==="
-          echo "Next.js cache key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}"
-          echo "Playwright cache key: playwright-browsers-${{ runner.os }}-v1"
-          echo "Supabase cache key: supabase-images-${{ env.SUPABASE_VERSION_HASH }}-${{ env.SUPABASE_CONFIG_HASH }}"
-          echo "pnpm-lock.yaml hash: ${{ hashFiles('**/pnpm-lock.yaml') }}"
-          echo "All TS/TSX files hash: ${{ hashFiles('**/*.ts', '**/*.tsx') }}"
-          echo "Supabase version hash: ${{ env.SUPABASE_VERSION_HASH }}"
-          echo "Supabase config hash: ${{ env.SUPABASE_CONFIG_HASH }}"
-          echo ""
-          echo "=== Cache Directory Status ==="
-          ls -la ~/.cache/ || echo "No ~/.cache directory found"
-          ls -la ~/.cache/ms-playwright || echo "No Playwright cache directory found"
-          ls -la .next/ || echo "No .next directory found"
-          ls -la /tmp/supabase-images || echo "No Supabase images cache directory found"
-          echo ""
-          echo "=== Supabase Cache Information ==="
-          ls -la ~/.cache/supabase || echo "No Supabase cache directory found"
-          ls -la ~/.local/share/supabase || echo "No Supabase local share directory found"
-          which supabase || echo "Supabase CLI not found in PATH"
-          supabase --version || echo "Cannot get Supabase version"
-          echo ""
-          echo "=== Docker Images (for Supabase) ==="
-          docker images | grep -E "^(supabase/|postgrest/)" || echo "No Supabase Docker images found"
-          docker system df || echo "Cannot get Docker system info"
-          echo ""
-          echo "=== Cache Hit/Miss Status ==="
-          echo "Playwright cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
-          echo "Next.js cache hit: ${{ steps.next-cache.outputs.cache-hit }}"
-          echo "Supabase cache hit: ${{ steps.cache-supabase.outputs.cache-hit }}"
-
-      - name: Setup E2E test environment
-        run: ./scripts/setup-e2e-tests.sh
 
       - name: Build next
         run: pnpm with-test-env next build
+
+      - name: Setup E2E test environment
+        run: ./scripts/setup-e2e-tests.sh
 
       - name: Run full Playwright suite
         run: ./scripts/e2e.sh
