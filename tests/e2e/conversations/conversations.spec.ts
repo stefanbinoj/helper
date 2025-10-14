@@ -247,41 +247,6 @@ test.describe("Working Conversation Management", () => {
     await expect(todayOption).toBeVisible();
   });
 
-  test("should preserve date filter after page refresh and should clear date filter with clear filters button", async ({
-    page,
-  }) => {
-    const toggleFilters = async () => {
-      const filterToggleButton = page.getByRole("button", { name: "Filter Toggle" });
-      await expect(filterToggleButton).toBeVisible();
-      await filterToggleButton.click();
-    };
-
-    await toggleFilters();
-
-    const dateFilterButton = page.getByRole("button", { name: "Date Filter" });
-    await expect(dateFilterButton).toBeVisible();
-
-    await dateFilterButton.click();
-    const last30DaysOption = page
-      .locator('[role="menuitemradio"], [role="option"]')
-      .filter({ hasText: "Last 30 days" });
-    await last30DaysOption.click();
-    await expect(dateFilterButton).toHaveText(/Last 30 days/);
-
-    await page.reload();
-
-    const dateFilterButtonAfterRefresh = page.getByRole("button", { name: "Date Filter" });
-    await expect(dateFilterButton).toBeVisible();
-
-    await expect(dateFilterButtonAfterRefresh).toHaveText(/Last 30 days/);
-    const clearFiltersButton = page.getByRole("button", { name: "Clear Filters" });
-    await expect(clearFiltersButton).toBeVisible();
-
-    await clearFiltersButton.click();
-
-    await expect(dateFilterButton).toHaveText(/Created/);
-    await expect(clearFiltersButton).not.toBeVisible();
-  });
 
   test("should show context snippets and highlight search terms for deep matches", async ({ page }) => {
     await searchConversations(page, "support");

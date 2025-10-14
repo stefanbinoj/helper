@@ -7,6 +7,9 @@ on:
       - test/*
   pull_request:
 
+permissions:
+  contents: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -44,7 +47,7 @@ jobs:
         id: playwright-cache
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: ${{ github.workspace }}/.cache/ms-playwright
           key: playwright-browsers-${{ runner.os }}-v1
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
@@ -57,14 +60,56 @@ jobs:
         id: next-cache
         uses: actions/cache@v4
         with:
-          path: .next/cache
-          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx') }}
+          path: |
+            .next/cache
+            ${{ github.workspace }}/.next/cache
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
-            next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
             next-cache-${{ runner.os }}-
 
       - name: Build next
         run: pnpm with-test-env next build
+
+      - name: Debug Show cache folder status and sizes
+        run: |
+          echo "📊 Cache Status Report"
+          echo "==================="
+          echo ""
+
+          echo "🔍 Next.js Cache Status:"
+          echo "Cache hit: ${{ steps.next-cache.outputs.cache-hit }}"
+          if [ -d ".next/cache" ]; then
+            echo "✅ .next/cache exists"
+            du -sh .next/cache || true
+            echo "Files in cache:"
+            ls -lh .next/cache || true
+          else
+            echo "⚠️ .next/cache does NOT exist"
+          fi
+
+          echo ""
+          echo "🎭 Playwright Cache Status:"
+          echo "Cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          playwright_path="${{ github.workspace }}/.cache/ms-playwright"
+          if [ -d "$playwright_path" ]; then
+            echo "✅ Playwright cache exists"
+            du -sh "$playwright_path" || true
+            ls -lh "$playwright_path" || true
+          else
+            echo "⚠️ Playwright cache does NOT exist at: $playwright_path"
+          fi
+
+          echo ""
+          echo "📦 pnpm Store Info:"
+          pnpm_store=$(pnpm store path)
+          echo "Store path: $pnpm_store"
+          if [ -d "$pnpm_store" ]; then
+            echo "✅ pnpm store exists"
+            du -sh "$pnpm_store" || true
+          else
+            echo "⚠️ pnpm store not found"
+          fi
+
 
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh

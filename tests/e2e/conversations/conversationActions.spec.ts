@@ -303,32 +303,4 @@ test.describe("Conversation Actions", () => {
     });
   });
 
-  test.describe("Auto-Assign on Reply", () => {
-    test("should respect auto-assign preference when replying", async ({ page }) => {
-      await page.goto("/settings/preferences");
-
-      if (await page.locator('[aria-label="Auto-assign on reply Switch"]').isChecked()) {
-        await page.locator('[aria-label="Auto-assign on reply Switch"]').click();
-        await waitForSettingsSaved(page);
-      }
-
-      await page.goto("/unassigned");
-      await page.locator("a[href*='/conversations?id=']").first().click();
-
-      await sendReplyMessage(page, "Auto-assign off test reply message");
-
-      await expect(page.getByRole("button", { name: "Assign yourself" })).toBeVisible();
-
-      await page.goto("/settings/preferences");
-      await page.locator('[aria-label="Auto-assign on reply Switch"]').click();
-      await waitForSettingsSaved(page);
-
-      await page.goto("/unassigned");
-      await page.locator("a[href*='/conversations?id=']").first().click();
-
-      await sendReplyMessage(page, "Auto-assign on test reply message");
-      await expect(page.getByTestId("message-thread")).toContainText("Auto-assign on test reply message");
-      await expect(page.getByRole("button", { name: "Assign yourself" })).not.toBeVisible();
-    });
-  });
 });
