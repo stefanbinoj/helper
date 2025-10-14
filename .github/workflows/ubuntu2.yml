@@ -1,0 +1,173 @@
+name: new supabacli ubuntu2
+
+on:
+  push:
+    branches:
+      - main
+      - test/*
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      CI: true
+      OPENAI_API_KEY: test-openai-api-key
+      FIRECRAWL_API_KEY: test-firecrawl-api-key
+      NODE_OPTIONS: --max_old_space_size=8192
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+            node-version-file: ".node-version"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          cache: true
+
+      - name: Install dependencies
+        run: pnpm install --ignore-scripts
+
+      - name: Setup Supabase CLI
+        run: pnpm rebuild supabase
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-v1
+          restore-keys: |
+            playwright-browsers-${{ runner.os }}-
+
+      - name: Install Playwright Browsers
+        run: pnpm playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Cache package builds
+        id: packages-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/client/dist
+            packages/react/dist
+            packages/sdk/dist
+          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
+          restore-keys: |
+            packages-${{ runner.os }}-
+
+      - name: Build essential packages
+        run: |
+          # Build @helperai/client first (dependency of react package)
+          pnpm --filter="@helperai/client" build
+          # Build @helperai/sdk (independent, but required by main app for types)
+          pnpm --filter="@helperai/sdk" build
+          # Then build @helperai/react (depends on client)
+          pnpm --filter="@helperai/react" build
+        if: steps.packages-cache.outputs.cache-hit != 'true'
+
+      - name: Cache Next.js build
+        id: next-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            ${{ github.workspace }}/.next/cache
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**', 'packages/sdk/dist/**') }}
+          restore-keys: |
+            next-cache-${{ runner.os }}-
+
+      - name: Build next
+        run: pnpm with-test-env next build
+
+      - name: Debug Show cache folder status and sizes
+        run: |
+          echo "📊 Cache Status Report"
+          echo "==================="
+          echo ""
+
+          echo "📦 Package Cache Status:"
+          echo "Cache hit: ${{ steps.packages-cache.outputs.cache-hit }}"
+          if [ -d "packages/client/dist" ]; then
+            echo "✅ @helperai/client dist exists"
+            du -sh packages/client/dist || true
+          else
+            echo "⚠️ @helperai/client dist does NOT exist"
+          fi
+          if [ -d "packages/react/dist" ]; then
+            echo "✅ @helperai/react dist exists"
+            du -sh packages/react/dist || true
+          else
+            echo "⚠️ @helperai/react dist does NOT exist"
+          fi
+          if [ -d "packages/sdk/dist" ]; then
+            echo "✅ @helperai/sdk dist exists"
+            du -sh packages/sdk/dist || true
+          else
+            echo "⚠️ @helperai/sdk dist does NOT exist"
+          fi
+          echo ""
+
+          echo "🔍 Next.js Cache Status:"
+          echo "Cache hit: ${{ steps.next-cache.outputs.cache-hit }}"
+          if [ -d ".next/cache" ]; then
+            echo "✅ .next/cache exists"
+            du -sh .next/cache || true
+            echo "Files in cache:"
+            ls -lh .next/cache || true
+          else
+            echo "⚠️ .next/cache does NOT exist"
+          fi
+
+          echo ""
+          echo "🎭 Playwright Cache Status:"
+          echo "Cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          playwright_path="$HOME/.cache/ms-playwright"
+          if [ -d "$playwright_path" ]; then
+            echo "✅ Playwright cache exists"
+            du -sh "$playwright_path" || true
+            ls -lh "$playwright_path" || true
+          else
+            echo "⚠️ Playwright cache does NOT exist at: $playwright_path"
+          fi
+
+          echo ""
+          echo "📦 pnpm Store Info:"
+          pnpm_store=$(pnpm store path)
+          echo "Store path: $pnpm_store"
+          if [ -d "$pnpm_store" ]; then
+            echo "✅ pnpm store exists"
+            du -sh "$pnpm_store" || true
+          else
+            echo "⚠️ pnpm store not found"
+          fi
+
+
+      - name: Setup E2E test environment
+        run: ./scripts/setup-e2e-tests.sh
+
+      - name: Run full Playwright suite
+        run: ./scripts/e2e.sh
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
