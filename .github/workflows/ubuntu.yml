@@ -43,8 +43,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --ignore-scripts
 
-      - name: Build supabase CLI
-        run: pnpm rebuild supabase
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.22.12
 
       - name: Cache Playwright browsers
         id: playwright-cache
