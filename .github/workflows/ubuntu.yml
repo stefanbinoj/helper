@@ -41,13 +41,13 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --ignore-scripts
 
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/.cache/ms-playwright
+          path: ~/.cache/ms-playwright
           key: playwright-browsers-${{ runner.os }}-v1
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
@@ -56,6 +56,25 @@ jobs:
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
+      - name: Cache package builds
+        id: packages-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/client/dist
+            packages/react/dist
+          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
+          restore-keys: |
+            packages-${{ runner.os }}-
+
+      - name: Build essential packages
+        run: |
+          # Build @helperai/client first (dependency of react package)
+          pnpm --filter="@helperai/client" build
+          # Then build @helperai/react (depends on client)
+          pnpm --filter="@helperai/react" build
+        if: steps.packages-cache.outputs.cache-hit != 'true'
+
       - name: Cache Next.js build
         id: next-cache
         uses: actions/cache@v4
@@ -63,7 +82,7 @@ jobs:
           path: |
             .next/cache
             ${{ github.workspace }}/.next/cache
-          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
 
@@ -74,6 +93,22 @@ jobs:
         run: |
           echo "📊 Cache Status Report"
           echo "==================="
+          echo ""
+
+          echo "📦 Package Cache Status:"
+          echo "Cache hit: ${{ steps.packages-cache.outputs.cache-hit }}"
+          if [ -d "packages/client/dist" ]; then
+            echo "✅ @helperai/client dist exists"
+            du -sh packages/client/dist || true
+          else
+            echo "⚠️ @helperai/client dist does NOT exist"
+          fi
+          if [ -d "packages/react/dist" ]; then
+            echo "✅ @helperai/react dist exists"
+            du -sh packages/react/dist || true
+          else
+            echo "⚠️ @helperai/react dist does NOT exist"
+          fi
           echo ""
 
           echo "🔍 Next.js Cache Status:"
@@ -90,7 +125,7 @@ jobs:
           echo ""
           echo "🎭 Playwright Cache Status:"
           echo "Cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
-          playwright_path="${{ github.workspace }}/.cache/ms-playwright"
+          playwright_path="$HOME/.cache/ms-playwright"
           if [ -d "$playwright_path" ]; then
             echo "✅ Playwright cache exists"
             du -sh "$playwright_path" || true
