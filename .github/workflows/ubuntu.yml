@@ -41,7 +41,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pnpm install --ignore-scripts
+        run: pnpm install
 
       - name: Cache Playwright browsers
         id: playwright-cache
