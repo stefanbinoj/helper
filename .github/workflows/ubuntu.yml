@@ -63,7 +63,8 @@ jobs:
           path: |
             packages/client/dist
             packages/react/dist
-          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
+            packages/sdk/dist
+          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
           restore-keys: |
             packages-${{ runner.os }}-
 
@@ -71,6 +72,8 @@ jobs:
         run: |
           # Build @helperai/client first (dependency of react package)
           pnpm --filter="@helperai/client" build
+          # Build @helperai/sdk (independent, but required by main app for types)
+          pnpm --filter="@helperai/sdk" build
           # Then build @helperai/react (depends on client)
           pnpm --filter="@helperai/react" build
         if: steps.packages-cache.outputs.cache-hit != 'true'
@@ -82,7 +85,7 @@ jobs:
           path: |
             .next/cache
             ${{ github.workspace }}/.next/cache
-          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**') }}
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**', 'packages/sdk/dist/**') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
 
@@ -108,6 +111,12 @@ jobs:
             du -sh packages/react/dist || true
           else
             echo "⚠️ @helperai/react dist does NOT exist"
+          fi
+          if [ -d "packages/sdk/dist" ]; then
+            echo "✅ @helperai/sdk dist exists"
+            du -sh packages/sdk/dist || true
+          else
+            echo "⚠️ @helperai/sdk dist does NOT exist"
           fi
           echo ""
 
