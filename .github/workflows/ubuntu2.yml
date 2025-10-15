@@ -61,10 +61,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            packages/client/dist
-            packages/react/dist
-            packages/sdk/dist
-          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
+            packages/*/dist
+            packages/*/node_modules
+          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', 'packages/*/node_modules/**', '!packages/*/dist/**') }}
           restore-keys: |
             packages-${{ runner.os }}-
 
@@ -84,7 +83,6 @@ jobs:
         with:
           path: |
             .next/cache
-            ${{ github.workspace }}/.next/cache
           key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**', 'packages/sdk/dist/**') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
