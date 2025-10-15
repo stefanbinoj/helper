@@ -43,9 +43,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --ignore-scripts
 
-      - name: Setup Supabase CLI
-        run: pnpm rebuild supabase
-
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
