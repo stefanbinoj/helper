@@ -40,9 +40,6 @@ jobs:
         with:
           cache: true
 
-      - name: Setup Supabase CLI
-        run: pnpm rebuild supabase
-
       - name: Install dependencies
         run: pnpm install --ignore-scripts
 
@@ -54,6 +51,9 @@ jobs:
           key: playwright-browsers-${{ runner.os }}-v1
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
+
+      - name: Setup Supabase CLI
+        run: pnpm rebuild supabase
 
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
