@@ -1,14 +1,10 @@
-name: new supabacli ubuntu2
+name: Advanced changes here
 
 on:
   push:
     branches:
       - main
-      - test/*
   pull_request:
-
-permissions:
-  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
