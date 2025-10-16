@@ -37,7 +37,7 @@ jobs:
           cache: true
 
       - name: Install supabase-cli
-        uses: supabase/setup-supabase@v1
+        uses: supabase/setup-cli@v1
         with:
           version: 'latest'
 
