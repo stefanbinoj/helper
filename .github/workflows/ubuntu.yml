@@ -108,7 +108,7 @@ jobs:
             next-cache-${{ runner.os }}-
 
       - name: Build next
-        run: pnpm with-test-env next build
+        run: pnpm with-test-env next build --no-lint
 
       - name: Debug Show cache folder status and sizes
         run: |
