@@ -39,10 +39,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --ignore-scripts
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.22.12
 
       - name: Cache Playwright browsers
         id: playwright-cache
@@ -57,6 +53,19 @@ jobs:
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
+      - name: Cache SDK build and dependencies
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            packages/sdk/node_modules
+            packages/sdk/dist
+            public/sdk*.js
+            public/sdk*.js.LICENSE.txt
+          key: sdk-${{ runner.os }}-${{ hashFiles('packages/sdk/**', '!packages/sdk/node_modules/**', '!packages/sdk/dist/**') }}
+          restore-keys: |
+            sdk-${{ runner.os }}-
+
       - name: Cache package builds
         id: packages-cache
         uses: actions/cache@v4
@@ -64,17 +73,20 @@ jobs:
           path: |
             packages/client/dist
             packages/react/dist
-            packages/sdk/dist
-          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
+          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
           restore-keys: |
             packages-${{ runner.os }}-
+
+      - name: Build SDK if needed
+        run: |
+          pnpm --filter="@helperai/sdk" install
+          pnpm --filter="@helperai/sdk" build
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
 
       - name: Build essential packages
         run: |
           # Build @helperai/client first (dependency of react package)
           pnpm --filter="@helperai/client" build
-          # Build @helperai/sdk (independent, but required by main app for types)
-          pnpm --filter="@helperai/sdk" build
           # Then build @helperai/react (depends on client)
           pnpm --filter="@helperai/react" build
         if: steps.packages-cache.outputs.cache-hit != 'true'
@@ -86,75 +98,12 @@ jobs:
           path: |
             .next/cache
             ${{ github.workspace }}/.next/cache
-          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**', 'packages/sdk/dist/**') }}
+          key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**', 'packages/sdk/dist/**', 'public/sdk*.js') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
 
       - name: Build next
         run: pnpm with-test-env next build
-
-      - name: Debug Show cache folder status and sizes
-        run: |
-          echo "📊 Cache Status Report"
-          echo "==================="
-          echo ""
-
-          echo "📦 Package Cache Status:"
-          echo "Cache hit: ${{ steps.packages-cache.outputs.cache-hit }}"
-          if [ -d "packages/client/dist" ]; then
-            echo "✅ @helperai/client dist exists"
-            du -sh packages/client/dist || true
-          else
-            echo "⚠️ @helperai/client dist does NOT exist"
-          fi
-          if [ -d "packages/react/dist" ]; then
-            echo "✅ @helperai/react dist exists"
-            du -sh packages/react/dist || true
-          else
-            echo "⚠️ @helperai/react dist does NOT exist"
-          fi
-          if [ -d "packages/sdk/dist" ]; then
-            echo "✅ @helperai/sdk dist exists"
-            du -sh packages/sdk/dist || true
-          else
-            echo "⚠️ @helperai/sdk dist does NOT exist"
-          fi
-          echo ""
-
-          echo "🔍 Next.js Cache Status:"
-          echo "Cache hit: ${{ steps.next-cache.outputs.cache-hit }}"
-          if [ -d ".next/cache" ]; then
-            echo "✅ .next/cache exists"
-            du -sh .next/cache || true
-            echo "Files in cache:"
-            ls -lh .next/cache || true
-          else
-            echo "⚠️ .next/cache does NOT exist"
-          fi
-
-          echo ""
-          echo "🎭 Playwright Cache Status:"
-          echo "Cache hit: ${{ steps.playwright-cache.outputs.cache-hit }}"
-          playwright_path="$HOME/.cache/ms-playwright"
-          if [ -d "$playwright_path" ]; then
-            echo "✅ Playwright cache exists"
-            du -sh "$playwright_path" || true
-            ls -lh "$playwright_path" || true
-          else
-            echo "⚠️ Playwright cache does NOT exist at: $playwright_path"
-          fi
-
-          echo ""
-          echo "📦 pnpm Store Info:"
-          pnpm_store=$(pnpm store path)
-          echo "Store path: $pnpm_store"
-          if [ -d "$pnpm_store" ]; then
-            echo "✅ pnpm store exists"
-            du -sh "$pnpm_store" || true
-          else
-            echo "⚠️ pnpm store not found"
-          fi
-
 
       - name: Setup E2E test environment
         run: ./scripts/setup-e2e-tests.sh
