@@ -69,6 +69,7 @@ jobs:
             packages/client/dist
             packages/react/dist
             packages/sdk/dist
+            packages/*/node_modules
           key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
           restore-keys: |
             packages-${{ runner.os }}-

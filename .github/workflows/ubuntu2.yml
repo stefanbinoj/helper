@@ -43,6 +43,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --ignore-scripts
 
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.22.12
+
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -51,9 +56,6 @@ jobs:
           key: playwright-browsers-${{ runner.os }}-v1
           restore-keys: |
             playwright-browsers-${{ runner.os }}-
-
-      - name: Setup Supabase CLI
-        run: pnpm rebuild supabase
 
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
@@ -64,9 +66,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            packages/*/dist
-            packages/*/node_modules
-          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', 'packages/*/node_modules/**', '!packages/*/dist/**') }}
+            packages/client/dist
+            packages/react/dist
+            packages/sdk/dist
+          key: packages-${{ runner.os }}-${{ hashFiles('packages/client/**', 'packages/react/**', 'packages/sdk/**', '!packages/*/node_modules/**', '!packages/*/dist/**') }}
           restore-keys: |
             packages-${{ runner.os }}-
 
@@ -86,6 +89,7 @@ jobs:
         with:
           path: |
             .next/cache
+            ${{ github.workspace }}/.next/cache
           key: next-cache-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('packages/client/dist/**', 'packages/react/dist/**', 'packages/sdk/dist/**') }}
           restore-keys: |
             next-cache-${{ runner.os }}-
