@@ -11,7 +11,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/image-cache
-        key: supabase-image-cache-${{ runner.os }}-${{ hashFiles('supabase/config.ci.toml') }}
+        key: supabase-image-cache-${{ runner.os }}-${{ hashFiles('supabase/config.ci.toml', '.github/common/docker-cache/action.yml') }}
         restore-keys: |
           supabase-image-cache-${{ runner.os }}-
 
@@ -19,27 +19,30 @@ runs:
       if: steps.image-cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        mkdir -p ~/image-cache
+        set -euo pipefail
+        mkdir -p "$HOME/image-cache"
 
-        docker pull supabase/postgres:${{ inputs.postgres_version }}
-        docker pull supabase/realtime:${{ inputs.realtime_version }}
-        docker pull supabase/gotrue:${{ inputs.gotrue_version }}
-        docker pull supabase/storage-api:${{ inputs.storage_version }}
-        docker pull supabase/postgrest:${{ inputs.postgrest_version }}
+        docker pull supabase/postgres
+        docker pull supabase/realtime
+        docker pull supabase/gotrue
+        docker pull supabase/storage-api
+        docker pull postgrest/postgrest
 
-        docker save supabase/postgres:${{ inputs.postgres_version }} -o ~/image-cache/supabase-postgres.tar
-        docker save supabase/realtime:${{ inputs.realtime_version }} -o ~/image-cache/supabase-realtime.tar
-        docker save supabase/gotrue:${{ inputs.gotrue_version }} -o ~/image-cache/supabase-gotrue.tar
-        docker save supabase/storage-api:${{ inputs.storage_version }} -o ~/image-cache/supabase-storage.tar
-        docker save supabase/postgrest:${{ inputs.postgrest_version }} -o ~/image-cache/supabase-postgrest.tar
+        docker save supabase/postgres -o "$HOME/image-cache/supabase-postgres.tar"
+        docker save supabase/realtime -o "$HOME/image-cache/supabase-realtime.tar"
+        docker save supabase/gotrue -o "$HOME/image-cache/supabase-gotrue.tar"
+        docker save supabase/storage-api -o "$HOME/image-cache/supabase-storage.tar"
+        docker save postgrest/postgrest -o "$HOME/image-cache/postgrest-postgrest.tar"
 
     - name: Load cached Supabase images (on cache hit)
       if: steps.image-cache.outputs.cache-hit == 'true'
       shell: bash
       run: |
-        docker load -i ~/image-cache/supabase-postgres.tar
-        docker load -i ~/image-cache/supabase-realtime.tar
-        docker load -i ~/image-cache/supabase-gotrue.tar
-        docker load -i ~/image-cache/supabase-storage.tar
-        docker load -i ~/image-cache/supabase-postgrest.tar
+        set -euo pipefail
+        shopt -s nullglob
+        for tar in "$HOME"/image-cache/*.tar; do
+          echo "Loading $tar"
+          docker load -i "$tar"
+        done
+        shopt -u nullglob
 
