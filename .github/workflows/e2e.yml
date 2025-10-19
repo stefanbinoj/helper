@@ -71,11 +71,25 @@ jobs:
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
-      - name: Setup E2E test environment
-        run: ./scripts/setup-e2e-tests.sh
-
       - name: Build next
         run: pnpm with-test-env next build
+
+      - name: Start Supabase services
+        run: |
+            export SUPABASE_CONFIG_PATH="./supabase/config.ci.toml"
+            pnpm run with-test-env pnpm supabase start
+
+      - name: Setup database
+        run: |
+          echo "⏳ Waiting for Auth service to initialize..."
+          sleep 5
+          echo "🔄 Resetting database..."
+          pnpm run with-test-env pnpm supabase db reset
+          echo "📦 Applying database migrations..."
+          pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
+
+      - name: Seed database
+        run: pnpm run with-test-env pnpm tsx --conditions=react-server ./db/seeds/seedDatabase.tsx
 
       - name: Run full Playwright suite
         run: ./scripts/e2e.sh
