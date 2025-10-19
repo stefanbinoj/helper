@@ -77,6 +77,12 @@ jobs:
 
       - name: Pull or use Supabase Docker images
         uses: ./.github/common/docker-cache
+        with:
+          postgres_version: "15.1.0.89"
+          realtime_version: "v2.29.5"
+          gotrue_version: "v2.121.0"
+          storage_version: "v0.44.7"
+          postgrest_version: "v11.2.0"
 
       - name: Start Supabase services
         run: |
