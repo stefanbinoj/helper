@@ -1,0 +1,15 @@
+# Dockerfile.supabase-prepull
+
+# This file doesn't actually build anything
+# It just forces Docker to pre-pull Supabase service images to warm the cache
+
+FROM supabase/postgres:15.1.0.89 AS postgres
+FROM supabase/gotrue:v2.121.0 AS gotrue
+FROM supabase/realtime:v2.29.5 AS realtime
+FROM supabase/storage-api:v0.44.7 AS storage
+FROM supabase/rest:v1.0.0 AS rest
+FROM supabase/studio:20231005-0 AS studio
+# Add any other Supabase services you use
+
+# Final dummy stage
+FROM alpine

@@ -85,6 +85,15 @@ jobs:
           restore-keys: |
             docker-buildx-${{ runner.os }}-
 
+      - name: Pre-pull Supabase service images with Buildx (optional but recommended)
+        run: |
+          docker buildx build \
+            --load \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache \
+            -f Dockerfile.supabase-prepull \
+            .
+
       - name: Start Supabase services
         run: |
           export SUPABASE_CONFIG_PATH="./supabase/config.ci.toml"
