@@ -89,7 +89,7 @@ jobs:
           pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
 
       - name: Seed database
-        run: pnpm run with-test-env pnpm tsx --conditions=react-server ./db/seeds/seedDatabase.tsx
+        run: pnpm run with-test-env pnpm tsx --conditions=react-server ./db/seeds/seedDatabase.ts
 
       - name: Run full Playwright suite
         run: ./scripts/e2e.sh
