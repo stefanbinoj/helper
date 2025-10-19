@@ -27,14 +27,12 @@ runs:
         docker pull public.ecr.aws/supabase/gotrue:v2.171.0
         docker pull public.ecr.aws/supabase/realtime:v2.34.47
         docker pull public.ecr.aws/supabase/storage-api:v1.22.11
-        docker pull public.ecr.aws/supabase/kong:2.8.1
 
         docker save public.ecr.aws/supabase/postgres:15.8.1.069 -o "$HOME/image-cache/supabase-postgres.tar"
         docker save public.ecr.aws/supabase/postgrest:v12.2.12 -o "$HOME/image-cache/supabase-postgrest.tar"
         docker save public.ecr.aws/supabase/gotrue:v2.171.0 -o "$HOME/image-cache/supabase-gotrue.tar"
         docker save public.ecr.aws/supabase/realtime:v2.34.47 -o "$HOME/image-cache/supabase-realtime.tar"
         docker save public.ecr.aws/supabase/storage-api:v1.22.11 -o "$HOME/image-cache/supabase-storage.tar"
-        docker save public.ecr.aws/supabase/kong:2.8.1 -o "$HOME/image-cache/supabase-kong.tar"
 
     - name: Load cached Supabase images (on cache hit)
       if: steps.image-cache.outputs.cache-hit == 'true'
@@ -45,5 +43,4 @@ runs:
         docker load -i ~/image-cache/supabase-gotrue.tar
         docker load -i ~/image-cache/supabase-storage.tar
         docker load -i ~/image-cache/supabase-postgrest.tar
-        docker load -i ~/image-cache/supabase-kong.tar
 
