@@ -14,7 +14,52 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  e2e:
+  supabase-setup:
+    runs-on: ${{ github.repository == 'antiwork/helper' && 'ubicloud-standard-4' || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      CI: true
+      OPENAI_API_KEY: test-openai-api-key
+      FIRECRAWL_API_KEY: test-firecrawl-api-key
+      NODE_OPTIONS: --max_old_space_size=8192
+      PNPM_STORE_PATH: ~/.pnpm-store
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".node-version"
+
+      - name: supabase cli install
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase services
+        run: |
+          export SUPABASE_CONFIG_PATH="./supabase/config.ci.toml"
+          pnpm run with-test-env pnpm supabase start
+
+      - name: Setup database
+        run: |
+          echo "⏳ Waiting for Auth service to initialize..."
+          sleep 5
+          echo "🔄 Resetting database..."
+          pnpm run with-test-env pnpm supabase db reset
+          echo "📦 Applying database migrations..."
+          pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
+
+      - name: Seed database
+        run: pnpm run with-test-env pnpm tsx --conditions=react-server ./db/seeds/seedDatabase.ts
+
+  build-and-prep:
     runs-on: ${{ github.repository == 'antiwork/helper' && 'ubicloud-standard-4' || 'ubuntu-latest' }}
     timeout-minutes: 60
     env:
@@ -71,17 +116,34 @@ jobs:
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
-      - name: Setup E2E test environment
-        run: ./scripts/setup-e2e-tests.sh
-
       - name: Build next
         run: pnpm with-test-env next build
 
-      - name: Run full Playwright suite
-        run: ./scripts/e2e.sh
+  e2e-tests:
+    runs-on: ${{ github.repository == 'antiwork/helper' && 'ubicloud-standard-4' || 'ubuntu-latest' }}
+    needs: [supabase-setup, build-and-prep]
+    timeout-minutes: 30
+    env:
+      CI: true
+      OPENAI_API_KEY: test-openai-api-key
+      FIRECRAWL_API_KEY: test-firecrawl-api-key
+      NODE_OPTIONS: --max_old_space_size=8192
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Upload Playwright HTML report
-        if: always()
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".node-version"
+
+      - name: Run full Playwright suite
+        run: pnpm run with-test-env pnpm playwright test
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
