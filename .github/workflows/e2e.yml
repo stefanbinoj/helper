@@ -37,8 +37,11 @@ jobs:
         with:
           node-version-file: ".node-version"
 
-      - name: supabase cli install
-      - uses: supabase/setup-cli@v1
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: latest
 
@@ -142,8 +145,14 @@ jobs:
         with:
           node-version-file: ".node-version"
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Run full Playwright suite
         run: pnpm run with-test-env pnpm playwright test
+
+      - name: Upload Playwright HTML report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
