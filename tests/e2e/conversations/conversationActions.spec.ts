@@ -328,7 +328,7 @@ test.describe("Conversation Actions", () => {
 
       await sendReplyMessage(page, "Auto-assign on test reply message");
       await expect(page.getByTestId("message-thread")).toContainText("Auto-assign on test reply message");
-      await expect(page.getByRole("button", { name: "support@gumroad.com" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "support@gumroad.comm" })).toBeVisible();
     });
   });
 });
