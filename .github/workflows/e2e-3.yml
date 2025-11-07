@@ -78,7 +78,7 @@ jobs:
 
       - name: Start Supabase services
         run: |
-            pnpm run with-test-env pnpm supabase start -x=storage-api,imgproxy,inbucket,edge-runtime,logflare,vector
+            pnpm run with-test-env pnpm supabase start -x=logflare,postgres-meta,mailpit,edge-runtime,studio,vector
 
       - name: Setup database
         run: |
@@ -101,6 +101,5 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
-
 
 
