@@ -1,4 +1,4 @@
-name: E2E-3
+name: E2E-big
 
 on:
   push:
