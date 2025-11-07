@@ -84,6 +84,13 @@ jobs:
           docker pull ghcr.io/supabase/kong:2.8.1
           docker pull ghcr.io/supabase/postgrest:v13.0.7
 
+      - name: Render Kong configuration
+        run: |
+          envsubst < ./supabase/kong.yml.template > ./supabase/kong.yml
+        env:
+          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+          SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+
       - name: Start and orchestrate Supabase services
         run: |
           # Create Docker network
@@ -148,7 +155,11 @@ jobs:
             --network supabase-net \
             -e KONG_DATABASE=off \
             -e KONG_DECLARATIVE_CONFIG=/var/lib/kong/kong.yml \
-            -p 8000:8000 \
+            -e KONG_PROXY_ACCESS_LOG=/dev/stdout \
+            -e KONG_ADMIN_ACCESS_LOG=/dev/stdout \
+            -e KONG_ADMIN_ERROR_LOG=/dev/stderr \
+            -v $(pwd)/supabase/kong.yml:/var/lib/kong/kong.yml:ro \
+            -p 5544:8000 \
             -p 8443:8443 \
             ghcr.io/supabase/kong:2.8.1
 
@@ -158,6 +169,11 @@ jobs:
           echo "✅ Supabase services started successfully"
           echo "API URL: http://127.0.0.1:5544"
           echo "DB URL: postgresql://postgres:postgres@127.0.0.1:5545/postgres"
+
+      - name: Initialize Supabase schemas
+        run: |
+          docker exec -i supa-db psql -U postgres -d postgres < ./supabase/init-schemas.sql
+          echo "✅ Supabase schemas initialized"
 
       - name: Run migrations
         run: |

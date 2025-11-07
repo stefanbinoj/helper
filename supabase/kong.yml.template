@@ -1,0 +1,119 @@
+_format_version: "2.1"
+
+_transform: true
+
+consumers:
+  - username: anon
+    keyauth_credentials:
+      - key: ${SUPABASE_ANON_KEY}
+  - username: service_role
+    keyauth_credentials:
+      - key: ${SUPABASE_SERVICE_KEY}
+
+acls:
+  - consumer: anon
+    group: anon
+  - consumer: service_role
+    group: admin
+
+services:
+  - name: auth-v1-open
+    url: http://supa-gotrue:9999/verify
+    routes:
+      - name: auth-v1-open
+        strip_path: true
+        paths:
+          - /auth/v1/verify
+    plugins:
+      - name: cors
+  
+  - name: auth-v1-open-callback
+    url: http://supa-gotrue:9999/callback
+    routes:
+      - name: auth-v1-open-callback
+        strip_path: true
+        paths:
+          - /auth/v1/callback
+    plugins:
+      - name: cors
+  
+  - name: auth-v1-open-authorize
+    url: http://supa-gotrue:9999/authorize
+    routes:
+      - name: auth-v1-open-authorize
+        strip_path: true
+        paths:
+          - /auth/v1/authorize
+    plugins:
+      - name: cors
+
+  - name: auth-v1
+    _comment: "GoTrue: /auth/v1/* -> http://supa-gotrue:9999/*"
+    url: http://supa-gotrue:9999/
+    routes:
+      - name: auth-v1-all
+        strip_path: true
+        paths:
+          - /auth/v1/
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: false
+
+  - name: rest-v1
+    _comment: "PostgREST: /rest/v1/* -> http://supa-postgrest:3000/*"
+    url: http://supa-postgrest:3000/
+    routes:
+      - name: rest-v1-all
+        strip_path: true
+        paths:
+          - /rest/v1/
+    plugins:
+      - name: cors
+      - name: key-auth
+        config:
+          hide_credentials: true
+
+  - name: storage-v1
+    _comment: "Storage: /storage/v1/* -> http://supa-storage:5000/*"
+    url: http://supa-storage:5000/
+    routes:
+      - name: storage-v1-all
+        strip_path: true
+        paths:
+          - /storage/v1/
+    plugins:
+      - name: cors
+
+  - name: meta
+    url: http://supa-postgrest:3000/
+    routes:
+      - name: meta-all
+        strip_path: true
+        paths:
+          - /pg/
+    plugins:
+      - name: key-auth
+        config:
+          hide_credentials: true
+      - name: acl
+        config:
+          hide_groups_header: true
+          allow:
+            - admin
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      headers:
+        - authorization
+        - content-type
+        - x-client-info
+        - apikey
+      exposed_headers:
+        - content-range
+      credentials: true
+      max_age: 3600
