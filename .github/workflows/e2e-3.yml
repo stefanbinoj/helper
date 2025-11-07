@@ -1,4 +1,4 @@
-name: E2E-big
+name: E2E-Working-Optimized
 
 on:
   push:
@@ -83,6 +83,9 @@ jobs:
       - name: Setup database
         run: |
           pnpm run with-test-env pnpm supabase db reset
+
+      - name: Run migrations
+        run: |
           pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
 
       - name: Seed database

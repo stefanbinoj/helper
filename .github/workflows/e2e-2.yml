@@ -1,4 +1,4 @@
-name: E2E-small
+name: E2E-2-Test
 
 on:
   push:
@@ -78,11 +78,20 @@ jobs:
 
       - name: Start Supabase services
         run: |
-            pnpm run with-test-env pnpm supabase start -x=kong,logflare,postgres-meta,mailpit,edge-runtime,studio,vector
+            docker pull ghcr.io/supabase/postgres:15.8.1.085
+            docker pull ghcr.io/supabase/storage-api:v1.28.2
+            docker pull ghcr.io/supabase/gotrue:v2.180.0
+            docker pull ghcr.io/supabase/kong:2.8.1
+            docker pull ghcr.io/supabase/postgrest:v13.0.7
+
+
 
       - name: Setup database
         run: |
           pnpm run with-test-env pnpm supabase db reset
+
+      - name: Run migrations
+        run: |
           pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
 
       - name: Seed database
@@ -101,4 +110,6 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+
 
