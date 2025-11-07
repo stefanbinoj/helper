@@ -95,7 +95,7 @@ jobs:
             --network supabase-net \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=postgres \
-            -p 5432:5432 \
+            -p 5545:5432 \
             ghcr.io/supabase/postgres:15.8.1.085
 
           # Wait for Postgres to be ready
@@ -156,8 +156,8 @@ jobs:
           sleep 5
 
           echo "✅ Supabase services started successfully"
-          echo "API URL: http://127.0.0.1:8000"
-          echo "DB URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+          echo "API URL: http://127.0.0.1:5544"
+          echo "DB URL: postgresql://postgres:postgres@127.0.0.1:5545/postgres"
 
       - name: Run migrations
         run: |
