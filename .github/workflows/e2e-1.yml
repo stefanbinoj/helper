@@ -71,9 +71,14 @@ jobs:
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
+      - name: Install supabase-cli
+        uses: supabase/setup-cli@v1
+        with:
+          version: "latest"
+
       - name: Start Supabase services
         run: |
-            pnpm run with-test-env pnpm supabase start
+             pnpm supabase start
 
       - name: Setup database
         run: |

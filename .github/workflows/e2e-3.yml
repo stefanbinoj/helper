@@ -1,4 +1,4 @@
-name: E2E-2
+name: E2E-3
 
 on:
   push:
@@ -70,6 +70,11 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Install supabase-cli
+        uses: supabase/setup-cli@v1
+        with:
+          version: "latest"
 
       - name: Start Supabase services
         run: |
