@@ -76,13 +76,88 @@ jobs:
         with:
           version: "latest"
 
-      - name: Start Supabase services
+      - name: Pull Supabase images
         run: |
-            docker pull ghcr.io/supabase/postgres:15.8.1.085
-            docker pull ghcr.io/supabase/storage-api:v1.28.2
-            docker pull ghcr.io/supabase/gotrue:v2.180.0
-            docker pull ghcr.io/supabase/kong:2.8.1
-            docker pull ghcr.io/supabase/postgrest:v13.0.7
+          docker pull ghcr.io/supabase/postgres:15.8.1.085
+          docker pull ghcr.io/supabase/storage-api:v1.28.2
+          docker pull ghcr.io/supabase/gotrue:v2.180.0
+          docker pull ghcr.io/supabase/kong:2.8.1
+          docker pull ghcr.io/supabase/postgrest:v13.0.7
+
+      - name: Start and orchestrate Supabase services
+        run: |
+          # Create Docker network
+          docker network create supabase-net || true
+
+          # Start Postgres database
+          docker run -d \
+            --name supa-db \
+            --network supabase-net \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=postgres \
+            -p 5432:5432 \
+            ghcr.io/supabase/postgres:15.8.1.085
+
+          # Wait for Postgres to be ready
+          echo "Waiting for Postgres to be ready..."
+          until docker exec supa-db pg_isready -U postgres; do
+            echo "Postgres is unavailable - waiting..."
+            sleep 1
+          done
+          echo "Postgres is ready"
+
+          # Start PostgREST
+          docker run -d \
+            --name supa-postgrest \
+            --network supabase-net \
+            -e PGRST_DB_URI="postgres://postgres:postgres@supa-db:5432/postgres" \
+            -e PGRST_DB_SCHEMA="public" \
+            -e PGRST_DB_ANON_ROLE="anon" \
+            -p 3000:3000 \
+            ghcr.io/supabase/postgrest:v13.0.7
+
+          # Start GoTrue (auth)
+          docker run -d \
+            --name supa-gotrue \
+            --network supabase-net \
+            -e GOTRUE_DB_DRIVER="postgres" \
+            -e GOTRUE_DATABASE_URL="postgres://postgres:postgres@supa-db:5432/postgres" \
+            -e GOTRUE_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long" \
+            -e GOTRUE_SITE_URL="http://localhost:3000" \
+            -e GOTRUE_API_HOST="0.0.0.0" \
+            -e GOTRUE_API_PORT="9999" \
+            -p 9999:9999 \
+            ghcr.io/supabase/gotrue:v2.180.0
+
+          # Start Storage API
+          docker run -d \
+            --name supa-storage \
+            --network supabase-net \
+            -e DATABASE_URL="postgres://postgres:postgres@supa-db:5432/postgres" \
+            -e ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" \
+            -e SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU" \
+            -e PGRST_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long" \
+            -e REGION="local" \
+            -e GLOBAL_S3_BUCKET="s3-bucket" \
+            -p 5000:5000 \
+            ghcr.io/supabase/storage-api:v1.28.2
+
+          # Start Kong (API Gateway)
+          docker run -d \
+            --name supa-kong \
+            --network supabase-net \
+            -e KONG_DATABASE=off \
+            -e KONG_DECLARATIVE_CONFIG=/var/lib/kong/kong.yml \
+            -p 8000:8000 \
+            -p 8443:8443 \
+            ghcr.io/supabase/kong:2.8.1
+
+          # Give services a moment to fully start
+          sleep 5
+
+          echo "✅ Supabase services started successfully"
+          echo "API URL: http://127.0.0.1:8000"
+          echo "DB URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres"
 
       - name: Run migrations
         run: |
@@ -104,6 +179,3 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
-
-
-
