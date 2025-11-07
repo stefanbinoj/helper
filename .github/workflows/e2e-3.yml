@@ -80,10 +80,6 @@ jobs:
         run: |
             pnpm run with-test-env pnpm supabase start -x=realtime,logflare,postgres-meta,mailpit,edge-runtime,studio,vector
 
-      - name: Setup database
-        run: |
-          pnpm run with-test-env pnpm supabase db reset
-
       - name: Run migrations
         run: |
           pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
