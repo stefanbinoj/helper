@@ -78,7 +78,7 @@ jobs:
 
       - name: Start Supabase services
         run: |
-            pnpm run with-test-env pnpm supabase start -x=kong, logflare, postgres-meta, mailpit, edge-runtime, studio, vector
+            pnpm run with-test-env pnpm supabase start -x=kong,logflare,postgres-meta,mailpit,edge-runtime,studio,vector
 
       - name: Setup database
         run: |
