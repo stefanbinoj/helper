@@ -84,12 +84,6 @@ jobs:
             docker pull ghcr.io/supabase/kong:2.8.1
             docker pull ghcr.io/supabase/postgrest:v13.0.7
 
-
-
-      - name: Setup database
-        run: |
-          pnpm run with-test-env pnpm supabase db reset
-
       - name: Run migrations
         run: |
           pnpm run with-test-env drizzle-kit migrate --config ./db/drizzle.config.ts
